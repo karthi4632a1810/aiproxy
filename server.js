@@ -13,24 +13,36 @@ import {
 } from "./proxyHandler.js";
 import { getLogs, clearLogs } from "./logger.js";
 import { createAgentRouter } from "./agent.js";
+import { AccountStore } from "./accountStore.js";
+import { createSecurity, monitorUsage } from "./auth.js";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || "127.0.0.1";
+const HOST = process.env.HOST || "0.0.0.0";
 const WORKSPACE_ROOT = path.resolve(process.env.WORKSPACE_ROOT || __dirname);
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-opus-5.5";
 const UPSTREAM_URL = process.env.UPSTREAM_URL || "https://freemodels-chat.freemodels.workers.dev";
 
+export async function createApp({ accountStore, agentCompletion } = {}) {
+const app = express();
+if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY);
+const store = accountStore || await new AccountStore(process.env.DATA_DIR || path.join(__dirname, 'data')).init();
+const security = createSecurity(store);
+const access = security.requireAccess();
+const dashboardAccess = security.requireAccess({ sessionOnly: true });
+const usage = monitorUsage(store);
+app.locals.accountStore = store;
+app.use((req, res, next) => { res.set('X-Content-Type-Options', 'nosniff'); res.set('Referrer-Policy', 'same-origin'); next(); });
 // Global Middlewares
 app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use('/api/auth', security.router);
+app.use('/api/account', security.accounts);
 app.use('/api/agent', await createAgentRouter({ root: WORKSPACE_ROOT,
-  apiKey: process.env.AGENT_API_KEY, enabled: process.env.AGENT_ENABLED !== 'false' }));
+  authorize: security.requireAccess({ agent: true }), monitor: usage, completion: agentCompletion, enabled: process.env.AGENT_ENABLED !== 'false' }));
 app.use(cors({ origin: "*", methods: "*" }));
 
 // Request logging in terminal
@@ -82,23 +94,23 @@ const listModelsHandler = (req, res) => {
   });
 };
 
-app.get("/v1/models", listModelsHandler);
-app.get("/models", listModelsHandler);
+app.get("/v1/models", access, listModelsHandler);
+app.get("/models", access, listModelsHandler);
 
 // OpenAI Compatible Chat Completions (Primary endpoint for Cline)
-app.post("/v1/chat/completions", handleOpenAIChatCompletion);
-app.post("/chat/completions", handleOpenAIChatCompletion);
+app.post("/v1/chat/completions", access, usage, handleOpenAIChatCompletion);
+app.post("/chat/completions", access, usage, handleOpenAIChatCompletion);
 
 // Anthropic Compatible Messages endpoint (For Cline Anthropic mode)
-app.post("/v1/messages", handleAnthropicMessages);
-app.post("/messages", handleAnthropicMessages);
+app.post("/v1/messages", access, usage, handleAnthropicMessages);
+app.post("/messages", access, usage, handleAnthropicMessages);
 
 // Direct payload endpoints
-app.post("/api/chat", handleDirectPayload);
-app.post("/payload", handleDirectPayload);
+app.post("/api/chat", access, usage, handleDirectPayload);
+app.post("/payload", access, usage, handleDirectPayload);
 
 // Root POST handler (if client posts directly to root URL)
-app.post("/", (req, res, next) => {
+app.post("/", access, usage, (req, res, next) => {
   if (req.body && (req.body.model || req.body.messages)) {
     return handleOpenAIChatCompletion(req, res);
   }
@@ -106,7 +118,7 @@ app.post("/", (req, res, next) => {
 });
 
 // Status & diagnostic API for Web UI
-app.get("/api/status", async (req, res) => {
+app.get("/api/status", dashboardAccess, async (req, res) => {
   let upstreamReachable = false;
   let upstreamLatencyMs = null;
 
@@ -148,15 +160,17 @@ app.get("/api/status", async (req, res) => {
 });
 
 // Logs API for Web UI
-app.get("/api/logs", (req, res) => {
+app.get("/api/logs", security.requireAccess({ sessionOnly: true, admin: true }), (req, res) => {
   res.json(getLogs());
 });
 
-app.post("/api/logs/clear", (req, res) => {
+app.post("/api/logs/clear", security.requireAccess({ sessionOnly: true, admin: true }), (req, res) => {
   clearLogs();
   res.json({ success: true });
 });
 
+app.use(security.errorHandler);
+app.use(['/api', '/v1'], (req, res) => res.status(404).json({ error: { message: 'Unknown API endpoint' } }));
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -165,6 +179,12 @@ app.use((req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+return app;
+}
+
+// Importing createApp in tests does not bind a port or create production data.
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+const app = await createApp();
 // Start server
 const server = app.listen(PORT, HOST, () => {
   console.log(`
@@ -184,7 +204,7 @@ const server = app.listen(PORT, HOST, () => {
 CLINE CONFIGURATION:
 1. Open Cline Settings -> API Provider: "OpenAI Compatible"
 2. Base URL:  http://localhost:${PORT}/v1
-3. API Key:   sk-proxy (or any text)
+3. API Key:   Create a key in the dashboard after login
 4. Model ID:  claude-opus-5.5 (or claude-sonnet-5, sol, terra, gpt-6-astra)
 =====================================================
 `);
@@ -197,3 +217,5 @@ server.on("error", (err) => {
     console.error("Server error:", err);
   }
 });
+
+}
