@@ -1,0 +1,22 @@
+services:
+  aiproxy:
+    image: aiproxy:latest
+    build: .
+    container_name: aiproxy
+    restart: unless-stopped
+    ports:
+      - "12345:12345"
+    environment:
+      - PORT=12345
+      - HOST=0.0.0.0
+      - DEFAULT_MODEL=claude-opus-5.5
+      - DEFAULT_THINKING=true
+      - DEFAULT_DEEP_SEARCH=true
+      - UPSTREAM_URL=https://freemodels-chat.freemodels.workers.dev
+      - SETUP_TOKEN=aiproxy-setup-token
+      - DATA_DIR=/app/data
+    volumes:
+      - aiproxy_data:/app/data
+
+volumes:
+  aiproxy_data:
