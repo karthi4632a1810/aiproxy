@@ -158,7 +158,7 @@ export class WorkspaceTools {
     signal?.throwIfAborted();
     return new Promise((resolve, reject) => {
       const env = { ...process.env }; delete env.AGENT_API_KEY;
-      const child = spawn(process.env.AGENT_SHELL || '/bin/bash', ['-lc', args.command], {
+      const child = spawn(process.env.AGENT_SHELL || '/bin/bash', ['-c', args.command], {
         cwd, env, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe']
       });
       let bytes = 0, timedOut = false, truncated = false, stdout = [], stderr = [];

@@ -6,8 +6,10 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node test/run.js"
   },
+  "engines": { "node": ">=20.3" },
   "keywords": [
     "cline",
     "ai-proxy",

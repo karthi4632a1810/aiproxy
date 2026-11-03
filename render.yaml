@@ -10,6 +10,10 @@ services:
         value: 20.20.2
       - key: PORT
         value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      - key: AGENT_ENABLED
+        value: "false"
       - key: DEFAULT_MODEL
         value: claude-opus-5.5
       - key: DEFAULT_THINKING

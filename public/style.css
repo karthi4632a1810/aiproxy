@@ -890,3 +890,11 @@ body {
 /* Utility */
 .font-mono { font-family: var(--font-mono); }
 .text-sm { font-size: 0.95rem; }
+/* Workspace agent controls and expandable tool results */
+.agent-access { display: grid; gap: 10px; padding: 16px; color: var(--text-muted); overflow-wrap: anywhere; }
+.agent-access label { display: grid; gap: 6px; font-size: .8rem; }
+.agent-access input { width: 100%; padding: 10px; border: 1px solid #334155; border-radius: 8px; background: #101827; color: #e2e8f0; }
+.tool-activity { margin: 10px 0; padding: 10px; border: 1px solid #334155; border-radius: 8px; color: #cbd5e1; }
+.tool-activity summary { cursor: pointer; }
+.tool-activity pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .75rem; }
+button:disabled { opacity: .55; cursor: default; }

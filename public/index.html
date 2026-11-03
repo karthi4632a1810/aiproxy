@@ -153,8 +153,8 @@
           <div class="section-title-wrap">
             <span class="section-icon">🧪</span>
             <div>
-              <h2 class="section-title">Interactive Live Playground</h2>
-              <p class="section-subtitle">Test streaming responses through the proxy in real-time</p>
+              <h2 class="section-title">Workspace Coding Agent</h2>
+              <p class="section-subtitle">Create and edit files, run commands, and inspect each tool result</p>
             </div>
           </div>
           <button id="clearChatBtn" class="btn btn-glass btn-sm">Clear</button>
@@ -178,6 +178,11 @@
 
           <div class="toggle-group">
             <label class="toggle-label">
+              <input type="checkbox" id="toggleAgent" checked>
+              <span class="toggle-custom"></span>
+              <span>Agent mode</span>
+            </label>
+            <label class="toggle-label">
               <input type="checkbox" id="toggleThinking" checked>
               <span class="toggle-custom"></span>
               <span>Thinking</span>
@@ -195,11 +200,19 @@
           </div>
         </div>
 
+        <div class="agent-access">
+          <span id="agentWorkspace">Connecting to workspace…</span>
+          <label>Agent key (if configured)
+            <input id="agentKey" type="password" autocomplete="off" placeholder="Local access connects automatically">
+          </label>
+          <small>Agent mode can change files. Commands run with the server user's permissions.</small>
+        </div>
+
         <!-- Quick Prompts Chips -->
         <div class="chips-container">
           <span class="chips-label">Quick Prompts:</span>
           <button class="prompt-chip" data-prompt="Hi! Introduce yourself and list your capabilities.">👋 Hello</button>
-          <button class="prompt-chip" data-prompt="Write a Python script to find the longest palindromic substring with explanations.">🐍 Python Code</button>
+          <button class="prompt-chip" data-prompt="Inspect this workspace and summarize its structure without changing any files.">📂 Inspect project</button>
           <button class="prompt-chip" data-prompt="Which is bigger: 9.11 or 9.9? Think step by step.">🧠 Logic Puzzle</button>
         </div>
 
@@ -207,7 +220,7 @@
         <div class="chat-display" id="chatDisplay">
           <div class="chat-placeholder">
             <div class="empty-icon">💬</div>
-            <p>Send a prompt below to see the proxy stream real-time tokens directly from the model.</p>
+            <p>Describe a coding task. The agent can read, create, edit and delete files, search the project, and run commands.</p>
           </div>
         </div>
 
@@ -217,6 +230,7 @@
           <button type="submit" id="sendBtn" class="btn btn-primary btn-send">
             <span id="sendBtnIcon">🚀</span> Send
           </button>
+          <button type="button" id="stopBtn" class="btn btn-secondary" disabled>Stop</button>
         </form>
       </section>
 
@@ -328,6 +342,7 @@
   <!-- Notification Toast -->
   <div id="toast" class="toast">Copied to clipboard!</div>
 
+  <script src="agent-client.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -12,6 +12,7 @@ import {
   handleDirectPayload
 } from "./proxyHandler.js";
 import { getLogs, clearLogs } from "./logger.js";
+import { createAgentRouter } from "./agent.js";
 
 dotenv.config();
 
@@ -20,13 +21,17 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || "127.0.0.1";
+const WORKSPACE_ROOT = path.resolve(process.env.WORKSPACE_ROOT || __dirname);
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-opus-5.5";
 const UPSTREAM_URL = process.env.UPSTREAM_URL || "https://freemodels-chat.freemodels.workers.dev";
 
 // Global Middlewares
-app.use(cors({ origin: "*", methods: "*" }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use('/api/agent', await createAgentRouter({ root: WORKSPACE_ROOT,
+  apiKey: process.env.AGENT_API_KEY, enabled: process.env.AGENT_ENABLED !== 'false' }));
+app.use(cors({ origin: "*", methods: "*" }));
 
 // Request logging in terminal
 app.use((req, res, next) => {
@@ -125,6 +130,7 @@ app.get("/api/status", async (req, res) => {
     });
     upstreamLatencyMs = Date.now() - t0;
     upstreamReachable = probe.ok;
+    await probe.body?.cancel();
   } catch (e) {
     upstreamReachable = false;
   }
@@ -160,13 +166,15 @@ app.use((req, res) => {
 });
 
 // Start server
-const server = app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`
 =====================================================
 🚀 AI PROXY SERVER RUNNING FOR CLINE
 =====================================================
 📡 Local URL:       http://localhost:${PORT}
-🌐 Network URL:     http://0.0.0.0:${PORT}
+🌐 Bind address:    ${HOST}:${PORT}
+📂 Workspace:       ${WORKSPACE_ROOT}
+🛠️  Workspace agent: ${process.env.AGENT_ENABLED !== 'false' ? 'Enabled at /api/agent/run' : 'Disabled'}
 ⚙️  Default Model:   ${DEFAULT_MODEL}
 🧠 Thinking Mode:   ${process.env.DEFAULT_THINKING !== "false" ? "Enabled (true)" : "Disabled (false)"}
 🔍 DeepSearch:      ${process.env.DEFAULT_DEEP_SEARCH !== "false" ? "Enabled (true)" : "Disabled (false)"}

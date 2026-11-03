@@ -149,174 +149,12 @@ window.selectModelForCline = function(modelId) {
   showToast(`Selected & copied Model ID: ${modelId}`);
 };
 
-// Initialize interactive playground
-function initPlayground() {
-  const chatForm = document.getElementById("chatForm");
-  const promptInput = document.getElementById("promptInput");
-  const chatDisplay = document.getElementById("chatDisplay");
-  const sendBtn = document.getElementById("sendBtn");
-  const clearChatBtn = document.getElementById("clearChatBtn");
-
-  // Chips click handlers
-  document.querySelectorAll(".prompt-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      promptInput.value = chip.getAttribute("data-prompt");
-      promptInput.focus();
-    });
-  });
-
-  // Clear chat
-  clearChatBtn?.addEventListener("click", () => {
-    chatDisplay.innerHTML = `
-      <div class="chat-placeholder">
-        <div class="empty-icon">💬</div>
-        <p>Send a prompt below to see the proxy stream real-time tokens directly from the model.</p>
-      </div>
-    `;
-  });
-
-  // Submit form
-  chatForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const prompt = promptInput.value.trim();
-    if (!prompt) return;
-
-    const model = document.getElementById("modelSelect").value;
-    const thinking = document.getElementById("toggleThinking").checked;
-    const deepSearch = document.getElementById("toggleDeepSearch").checked;
-    const stream = document.getElementById("toggleStream").checked;
-
-    // Remove placeholder
-    const placeholder = chatDisplay.querySelector(".chat-placeholder");
-    if (placeholder) placeholder.remove();
-
-    // Append User Message
-    const userBubble = document.createElement("div");
-    userBubble.className = "chat-bubble chat-user";
-    userBubble.textContent = prompt;
-    chatDisplay.appendChild(userBubble);
-
-    promptInput.value = "";
-    promptInput.disabled = true;
-    sendBtn.disabled = true;
-    sendBtn.innerHTML = `<span>⏳</span> Streaming...`;
-
-    // Append Assistant Message placeholder
-    const assistantBubble = document.createElement("div");
-    assistantBubble.className = "chat-bubble chat-assistant";
-    assistantBubble.innerHTML = `<span class="streaming-cursor">▊</span>`;
-    chatDisplay.appendChild(assistantBubble);
-    chatDisplay.scrollTop = chatDisplay.scrollHeight;
-
-    const startTime = performance.now();
-    let accumulatedText = "";
-    let tokenCount = 0;
-
-    try {
-      if (stream) {
-        const response = await fetch("/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: "user", content: prompt }],
-            thinking,
-            deepSearch,
-            stream: true
-          })
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`HTTP ${response.status}: ${errText}`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed === "data: [DONE]") continue;
-
-            if (trimmed.startsWith("data:")) {
-              try {
-                const parsed = JSON.parse(trimmed.slice(5).trim());
-                const content = parsed.choices?.[0]?.delta?.content || "";
-                if (content) {
-                  accumulatedText += content;
-                  tokenCount++;
-                  renderFormattedText(assistantBubble, accumulatedText, true);
-                  chatDisplay.scrollTop = chatDisplay.scrollHeight;
-                }
-              } catch {}
-            }
-          }
-        }
-      } else {
-        // Non-streaming fetch
-        const response = await fetch("/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: "user", content: prompt }],
-            thinking,
-            deepSearch,
-            stream: false
-          })
-        });
-
-        const data = await response.json();
-        accumulatedText = data.choices?.[0]?.message?.content || "No response received.";
-        tokenCount = Math.ceil(accumulatedText.length / 4);
-      }
-
-      const totalTimeMs = (performance.now() - startTime).toFixed(0);
-      const tokensPerSec = ((tokenCount / (totalTimeMs / 1000)) || 0).toFixed(1);
-
-      renderFormattedText(assistantBubble, accumulatedText, false);
-
-      // Append metadata footer
-      const meta = document.createElement("div");
-      meta.className = "chat-meta-bar";
-      meta.innerHTML = `
-        <span>Model: <strong>${model}</strong></span>
-        <span>Duration: <strong>${totalTimeMs}ms</strong></span>
-        <span>Speed: <strong>~${tokensPerSec} tokens/s</strong></span>
-      `;
-      assistantBubble.appendChild(meta);
-    } catch (err) {
-      assistantBubble.innerHTML = `<span style="color: #ef4444;">⚠️ Error: ${err.message}</span>`;
-    } finally {
-      promptInput.disabled = false;
-      sendBtn.disabled = false;
-      sendBtn.innerHTML = `<span>🚀</span> Send`;
-      promptInput.focus();
-      chatDisplay.scrollTop = chatDisplay.scrollHeight;
-
-      // Update logs table
-      setTimeout(fetchLogs, 500);
-    }
-  });
-}
-
 // Simple text & markdown code renderer
 function renderFormattedText(container, text, isStreaming = false) {
   // Simple code block parser
   const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
-  let html = text.replace(codeBlockRegex, (match, lang, code) => {
-    return `<pre><code>${escapeHtml(code.trim())}</code></pre>`;
+  let html = escapeHtml(text).replace(codeBlockRegex, (match, lang, code) => {
+    return `<pre><code>${code.trim()}</code></pre>`;
   });
 
   // Convert linebreaks
@@ -371,8 +209,8 @@ async function fetchLogs() {
       return `
         <tr>
           <td class="font-mono" style="color: var(--text-dim);">${timeStr}</td>
-          <td><code class="font-mono text-xs">${item.endpoint}</code></td>
-          <td><strong>${item.model}</strong></td>
+          <td><code class="font-mono text-xs">${escapeHtml(item.endpoint)}</code></td>
+          <td><strong>${escapeHtml(item.model)}</strong></td>
           <td style="font-size: 0.72rem; color: var(--text-muted);">${flags}</td>
           <td><span class="status-pill-table ${statusClass}">${item.status}</span></td>
           <td>${item.tokensGenerated} tokens &bull; ${item.durationMs}ms</td>
