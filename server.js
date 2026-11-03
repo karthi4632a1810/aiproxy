@@ -29,7 +29,7 @@ const UPSTREAM_URL = process.env.UPSTREAM_URL || "https://freemodels-chat.freemo
 
 export async function createApp({ accountStore, agentCompletion } = {}) {
 const app = express();
-if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY);
+app.set('trust proxy', process.env.TRUST_PROXY || 1);
 const store = accountStore || await new AccountStore(process.env.DATA_DIR || path.join(__dirname, 'data')).init();
 const security = createSecurity(store);
 const access = security.requireAccess();

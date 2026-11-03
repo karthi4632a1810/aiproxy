@@ -10,9 +10,22 @@ const local = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socke
 export function createSecurity(store, { origin = process.env.APP_ORIGIN, setupToken = process.env.SETUP_TOKEN } = {}) {
   if (origin) origin = new URL(origin).origin;
   const cookieToken = req => (req.get('cookie') || '').split(';').map(x => x.trim()).find(x => x.startsWith(COOKIE + '='))?.slice(COOKIE.length + 1);
-  const expectedOrigin = req => origin || `${req.protocol}://${req.get('host')}`;
+  const expectedOrigin = req => {
+    if (origin) return origin;
+    const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+    return `${proto}://${req.get('host')}`;
+  };
+  const isMatchingOrigin = (req, checkOriginVal) => {
+    if (!checkOriginVal) return true;
+    const exp = expectedOrigin(req);
+    if (checkOriginVal === exp) return true;
+    const strip = u => String(u).replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase();
+    return strip(checkOriginVal) === strip(exp);
+  };
   const checkOrigin = (req, res, next) => {
-    if ((req.get('origin') && req.get('origin') !== expectedOrigin(req)) || req.get('sec-fetch-site') === 'cross-site') return next(fail(403, 'Cross-origin account access denied'));
+    if ((req.get('origin') && !isMatchingOrigin(req, req.get('origin'))) || req.get('sec-fetch-site') === 'cross-site') {
+      return next(fail(403, 'Cross-origin account access denied'));
+    }
     next();
   };
   const session = req => {
@@ -35,14 +48,17 @@ export function createSecurity(store, { origin = process.env.APP_ORIGIN, setupTo
     } else auth = session(req);
     if (!auth) throw fail(401, 'Log in or supply a valid API key');
     if (auth.kind === 'session') {
-      if ((req.get('origin') && req.get('origin') !== expectedOrigin(req)) || req.get('sec-fetch-site') === 'cross-site') throw fail(403, 'Cross-origin session access denied');
+      if ((req.get('origin') && !isMatchingOrigin(req, req.get('origin'))) || req.get('sec-fetch-site') === 'cross-site') throw fail(403, 'Cross-origin session access denied');
       if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('x-csrf-token') !== auth.session.csrf) throw fail(403, 'Invalid CSRF token; reload and try again');
     }
     if ((admin || agent) && auth.user.role !== 'admin') throw fail(403, 'Administrator access required');
     if (agent && auth.key && !auth.key.agent) throw fail(403, 'This API key does not have workspace access');
     req.auth = auth; next();
   });
-  const cookie = (req, res, token, maxAge = 43200) => res.setHeader('Set-Cookie', `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${expectedOrigin(req).startsWith('https:') ? '; Secure' : ''}`);
+  const cookie = (req, res, token, maxAge = 43200) => {
+    const isHttps = (req.get('x-forwarded-proto') || req.protocol) === 'https' || expectedOrigin(req).startsWith('https:');
+    res.setHeader('Set-Cookie', `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${isHttps ? '; Secure' : ''}`);
+  };
   const router = express.Router();
   router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(checkOrigin);
