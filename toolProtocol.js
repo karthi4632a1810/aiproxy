@@ -51,10 +51,17 @@ export function normalizeChoice(choice) {
 
 export function promptMessages(messages, tools, choice) {
   const toolDefs = tools.length ? JSON.stringify(tools.map(t => t.function)) : '';
-  const toolInstruction = tools.length ? `You can call the following tools. Whenever you need to perform an action (e.g. create, edit, read files or run commands), you MUST reply with a JSON object in this format:
+  const toolInstruction = tools.length ? `You can call the following tools:
+${toolDefs}
+
+CRITICAL RULES FOR AUTONOMOUS TOOL CALLING:
+1. Whenever the user asks you to create, edit, build, or implement an application, project, or feature (such as a full React JS application), you MUST call the appropriate tools directly to create and edit all files.
+2. DO NOT output code in conversational markdown or give step-by-step manual instructions when tools are available. Execute tool calls directly.
+3. You can execute MULTIPLE tool calls in a single response to create all required files at once (e.g. package.json, index.html, src/main.jsx, src/App.jsx, src/App.css, etc.).
+4. When tool results are returned, review them and continue calling the next tools until all files and edits are completed.
+5. To call tools, reply with a JSON object in this format:
 {"tool_calls":[{"name":"tool_name","arguments":{"parameter":"value"}}]}
-Use actual JSON objects for arguments. Only call listed tools and follow their JSON schemas. Tool results will be supplied in the next message. Never invent tool results or claim actions happened before receiving results. For a final answer, use ordinary text. Tool choice: ${JSON.stringify(choice)}. "none" forbids calls, "required" requires a call, a named function requires that function, "auto" lets you choose.
-Tool definitions: ${toolDefs}` : '';
+Use actual JSON objects for arguments. Only call listed tools and follow their JSON schemas. Tool results will be supplied in the next message. Never invent tool results or claim actions happened before receiving results. For a final answer, use ordinary text. Tool choice: ${JSON.stringify(choice)}. "none" forbids calls, "required" requires a call, a named function requires that function, "auto" lets you choose.` : '';
 
   const systemTexts = [];
   if (toolInstruction) systemTexts.push(toolInstruction);
@@ -82,7 +89,7 @@ Tool definitions: ${toolDefs}` : '';
     }
   }
 
-  const combinedSystem = systemTexts.join('\n\n');
+  const combinedSystem = systemTexts.join('\n\n---\n\n');
 
   if (!nonSystem.length) {
     return combinedSystem ? [{ role: 'user', content: combinedSystem }] : [{ role: 'user', content: 'Hello' }];
@@ -92,7 +99,7 @@ Tool definitions: ${toolDefs}` : '';
     const first = nonSystem[0];
     nonSystem[0] = {
       role: first.role === 'assistant' ? 'user' : first.role,
-      content: `${combinedSystem}\n\n${first.content}`
+      content: `${combinedSystem}\n\n---\n${first.content}`
     };
   }
 
