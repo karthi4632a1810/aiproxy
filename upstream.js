@@ -68,7 +68,7 @@ export async function complete({ messages, tools = [], toolChoice = 'auto', opti
   else for await (const event of readSSE(response.body)) consume(event);
   let toolCalls = [...calls.values()].map(c => ({ ...c, id: c.id || toolId() }));
   if (!toolCalls.length && tools.length && toolChoice !== 'none') {
-    const parsed = parseToolReply(content);
+    const parsed = parseToolReply(content, tools);
     if (parsed) { content = parsed.content; toolCalls = parsed.tool_calls; }
   }
   if (toolCalls.length && ['length', 'content_filter'].includes(finishReason)) throw new Error('Incomplete tool response; no tools were executed');
