@@ -2,3 +2,4 @@
 // restrict child test-runner IPC or local network ports.
 import './agent.test.js';
 import './protocol.test.js';
+import './accounts.test.js';

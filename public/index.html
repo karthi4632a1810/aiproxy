@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="auth-loading">
   <div class="ambient-glow glow-1"></div>
   <div class="ambient-glow glow-2"></div>
 
@@ -24,6 +24,9 @@
         </div>
       </div>
       <div class="nav-right">
+        <span id="accountIdentity"></span>
+        <a href="#accountPanel" class="btn btn-secondary btn-sm">API Keys & Usage</a>
+        <button id="logoutBtn" class="btn btn-secondary btn-sm">Sign out</button>
         <div id="statusPill" class="status-pill status-loading">
           <span class="status-dot"></span>
           <span id="statusText">Connecting...</span>
@@ -37,6 +40,66 @@
 
   <!-- Main Container -->
   <main class="main-container">
+    <section id="accountPanel" class="section-card">
+      <div class="section-header">
+        <div><h2 class="section-title">API Keys & Usage</h2><p class="section-subtitle">Create a separate key for each person, Cline installation or CLI client.</p></div>
+        <button id="refreshUsage" class="btn btn-secondary btn-sm">Refresh usage</button>
+      </div>
+      <p id="accountError" class="form-error" role="alert"></p>
+      <form id="createKeyForm" class="account-form account-form-row">
+        <label>Key name<input name="keyName" placeholder="Karthi · Cline laptop" required maxlength="80"></label>
+        <label>Owner<select id="keyOwner" name="userId"></select></label>
+        <label>Client<select name="client"><option>Cline</option><option>CLI</option><option>Other</option></select></label>
+        <label>Expires<select name="expiry"><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option><option value="0">Never</option></select></label>
+        <label class="checkbox-label" data-admin><input name="agent" type="checkbox"> Allow workspace agent</label>
+        <button type="submit" class="btn btn-primary">Create key</button>
+      </form>
+      <div id="newKeyBox" class="new-key-box" hidden>
+        <strong>Copy this key now. It will not be shown again.</strong>
+        <p>Paste it into Cline's API Key field or use Authorization: Bearer in your CLI.</p>
+        <input id="newKeyValue" readonly aria-label="New API key" autocomplete="off">
+        <button id="copyNewKey" class="btn btn-primary btn-sm">Copy key</button>
+        <button id="dismissNewKey" class="btn btn-secondary btn-sm">Done</button>
+      </div>
+      <div class="table-container"><table class="data-table">
+        <thead><tr><th>Name</th><th>Owner</th><th>Client</th><th>Key prefix</th><th>Status</th><th>Requests (all time)</th><th>Tokens (all time)</th><th>Errors / stopped</th><th>Last used</th><th>Action</th></tr></thead>
+        <tbody id="keysBody"></tbody>
+      </table></div>
+      <div class="account-filters">
+        <label>Key <select id="usageKey"><option value="">All keys + dashboard</option></select></label>
+        <label>Period <select id="usageDays"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select></label>
+      </div>
+      <div class="stats-grid usage-stats">
+        <div class="stat-card"><div class="stat-label">Requests</div><div id="usageRequests" class="stat-value">0</div></div>
+        <div class="stat-card"><div class="stat-label">Input tokens</div><div id="usageInput" class="stat-value">0</div></div>
+        <div class="stat-card"><div class="stat-label">Output tokens</div><div id="usageOutput" class="stat-value">0</div></div>
+        <div class="stat-card"><div class="stat-label">Errors / stopped</div><div id="usageErrors" class="stat-value">0</div></div>
+      </div>
+      <p id="usageEstimate" class="section-subtitle"></p>
+      <h3>Recent requests</h3>
+      <p class="section-subtitle">Latest 200 matching requests from the 1,000 retained details. Daily totals are kept for 90 days.</p>
+      <div class="table-container"><table class="data-table">
+        <thead><tr><th>Time</th><th>Owner</th><th>Key</th><th>Client label</th><th>Model</th><th>Result</th><th>Input / output tokens</th><th>Duration</th><th>IP</th><th>Client hint / user agent</th><th>Endpoint</th></tr></thead>
+        <tbody id="usageBody"></tbody>
+      </table></div>
+      <details data-admin class="account-details"><summary>Manage users</summary>
+        <form id="createUserForm" class="account-form account-form-row">
+          <label>Name<input name="name" required maxlength="80" autocomplete="off"></label>
+          <label>Email<input name="email" type="email" required autocomplete="off"></label>
+          <label>Initial password<input name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password"></label>
+          <label>Role<select name="role"><option value="member">Member</option><option value="admin">Administrator</option></select></label>
+          <button type="submit" class="btn btn-primary">Add user</button>
+        </form>
+        <div class="table-container"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+      </details>
+      <details class="account-details"><summary>Change your password</summary>
+        <form id="passwordForm" class="account-form account-form-row">
+          <label>Current password<input name="currentPassword" type="password" required autocomplete="current-password"></label>
+          <label>New password<input name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password"></label>
+          <button type="submit" class="btn btn-secondary">Change password and sign out</button>
+        </form>
+      </details>
+    </section>
     <!-- Hero Header -->
     <section class="hero-section">
       <div class="hero-badge">
@@ -117,10 +180,9 @@
           <div class="step-content">
             <span class="step-label">API Key</span>
             <div class="step-val-box">
-              <code>sk-freemodels-proxy</code>
-              <button class="copy-icon-btn" data-copy="sk-freemodels-proxy" title="Copy value">📋</button>
+              <a href="#accountPanel">Create an API key below</a>
             </div>
-            <span class="step-hint">Any non-empty string</span>
+            <span class="step-hint">Use a separate named key per person and client</span>
           </div>
         </div>
 
@@ -202,9 +264,6 @@
 
         <div class="agent-access">
           <span id="agentWorkspace">Connecting to workspace…</span>
-          <label>Agent key (if configured)
-            <input id="agentKey" type="password" autocomplete="off" placeholder="Local access connects automatically">
-          </label>
           <small>Agent mode can change files. Commands run with the server user's permissions.</small>
         </div>
 
@@ -254,7 +313,7 @@
     </div>
 
     <!-- Live Request Inspector -->
-    <section class="section-card" id="logsSection">
+    <section class="section-card" id="logsSection" data-admin>
       <div class="section-header">
         <div class="section-title-wrap">
           <span class="section-icon">📡</span>
@@ -342,6 +401,8 @@
   <!-- Notification Toast -->
   <div id="toast" class="toast">Copied to clipboard!</div>
 
+  <script src="auth-client.js"></script>
+  <script src="accounts.js"></script>
   <script src="agent-client.js"></script>
   <script src="app.js"></script>
 </body>

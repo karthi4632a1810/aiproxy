@@ -19,13 +19,14 @@ export function normalizeMessages(body) {
     }));
     const results = blocks.filter(p => p.type === 'tool_result');
     const content = textContent(msg.content);
+    // Results must immediately follow the assistant's calls in native mode.
+    for (const result of results) messages.push({ role: 'tool', tool_call_id: result.tool_use_id,
+      content: (result.is_error ? 'Tool error: ' : '') + textContent(result.content) });
     if (content || calls.length || !results.length) {
       messages.push({ role: msg.role || 'user', content,
         ...(msg.tool_calls || calls.length ? { tool_calls: msg.tool_calls || calls } : {}),
         ...(msg.tool_call_id ? { tool_call_id: msg.tool_call_id } : {}) });
     }
-    for (const result of results) messages.push({ role: 'tool', tool_call_id: result.tool_use_id,
-      content: (result.is_error ? 'Tool error: ' : '') + textContent(result.content) });
   }
   if (!messages.length) messages.push({ role: 'user', content: textContent(body.prompt) || 'Hello' });
   return messages;

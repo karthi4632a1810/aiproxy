@@ -28,21 +28,25 @@ export async function* readSSE(body) {
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
 
-export async function complete({ messages, tools = [], toolChoice = 'auto', options, signal, onText, fetchImpl = fetch }) {
+export async function complete({ messages, tools = [], toolChoice = 'auto', options, signal, onText, onUsage, fetchImpl = fetch }) {
   const native = process.env.TOOL_CALL_MODE === 'native';
   const payload = { messages: native ? messages : promptMessages(messages, tools, toolChoice),
     modelId: options.modelId, thinking: options.thinking, deepSearch: options.deepSearch, stream: true };
   if (native && tools.length) Object.assign(payload, { tools, tool_choice: toolChoice });
+  let content = '', finishReason = 'stop', reportedUsage;
+  const calls = new Map();
+  const estimatedInput = Math.ceil(JSON.stringify(payload).length / 4);
+  try {
   const timeout = AbortSignal.timeout(Number(process.env.UPSTREAM_TIMEOUT_MS) || 120000);
   const response = await fetchImpl(process.env.UPSTREAM_URL || 'https://freemodels-chat.freemodels.workers.dev', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://freemodels.pro', Referer: 'https://freemodels.pro/' },
     body: JSON.stringify(payload), signal: signal ? AbortSignal.any([signal, timeout]) : timeout
   });
   if (!response.ok) throw new Error(`Upstream HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`);
-  let content = '', finishReason = 'stop';
-  const calls = new Map();
   let responseBytes = 0;
   const consume = event => {
+    if (event.usage && Number.isFinite(event.usage.prompt_tokens) && Number.isFinite(event.usage.completion_tokens)
+      && event.usage.prompt_tokens >= 0 && event.usage.completion_tokens >= 0) reportedUsage = event.usage;
     responseBytes += Buffer.byteLength(JSON.stringify(event));
     if (responseBytes > 4 * 1024 * 1024) throw new Error('Upstream response exceeded 4 MiB');
     if (event.error) throw new Error(event.error.message || JSON.stringify(event.error));
@@ -69,6 +73,12 @@ export async function complete({ messages, tools = [], toolChoice = 'auto', opti
   }
   if (toolCalls.length && ['length', 'content_filter'].includes(finishReason)) throw new Error('Incomplete tool response; no tools were executed');
   validateCalls(toolCalls, tools, toolChoice);
+  if (!content && !toolCalls.length) throw new Error('Upstream returned an empty response');
   return { role: 'assistant', content: content || null, ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
     finishReason: toolCalls.length ? 'tool_calls' : finishReason };
+  } finally {
+    onUsage?.({ inputTokens: reportedUsage?.prompt_tokens ?? estimatedInput,
+      outputTokens: reportedUsage?.completion_tokens ?? Math.ceil((content.length + [...calls.values()].reduce((n, c) => n + c.function.arguments.length + c.function.name.length, 0)) / 4),
+      estimated: !reportedUsage });
+  }
 }

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in · AI Proxy</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="login-shell">
+    <section class="section-card login-card">
+      <div class="hero-badge">AI Proxy</div>
+      <h1 id="loginTitle">Sign in</h1>
+      <p id="loginDescription">Manage your API keys and monitor their usage.</p>
+      <form id="loginForm" class="account-form">
+        <label id="nameField" hidden>Name<input name="name" autocomplete="name" maxlength="80"></label>
+        <label>Email<input name="email" type="email" autocomplete="username" required maxlength="254"></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label>
+        <label id="setupTokenField" hidden>Setup token<input name="setupToken" type="password" autocomplete="off"></label>
+        <p id="loginError" role="alert" class="form-error"></p>
+        <button id="loginSubmit" class="btn btn-primary" disabled>Loading…</button>
+      </form>
+      <p id="loginHelp" class="section-subtitle">Ask your administrator for an account.</p>
+    </section>
+  </main>
+  <script src="login.js"></script>
+</body>
+</html>

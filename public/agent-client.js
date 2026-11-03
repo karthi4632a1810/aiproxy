@@ -7,26 +7,18 @@ function initPlayground() {
   const stop = document.getElementById('stopBtn');
   const clear = document.getElementById('clearChatBtn');
   const agentToggle = document.getElementById('toggleAgent');
-  const keyInput = document.getElementById('agentKey');
   const workspaceLabel = document.getElementById('agentWorkspace');
   const histories = { agent: [], chat: [] };
-  let token = '', controller;
+  let controller;
 
   async function connectAgent() {
-    token = keyInput.value.trim();
-    if (!token) {
-      const response = await fetch('/api/agent/session', { method: 'POST' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || 'Agent connection failed');
-      token = data.token;
-    }
-    const response = await fetch('/api/agent/tools', { headers: { Authorization: `Bearer ${token}` } });
+    const response = await apiFetch('/api/agent/tools');
     const data = await response.json();
     if (!response.ok) throw new Error(data.error?.message || 'Agent connection failed');
     workspaceLabel.textContent = `Workspace: ${data.workspace}`;
   }
-  connectAgent().catch(error => { workspaceLabel.textContent = error.message; });
-  keyInput.addEventListener('change', () => connectAgent().catch(error => { token = ''; workspaceLabel.textContent = error.message; }));
+  if (currentUser.role === 'admin') connectAgent().catch(error => { workspaceLabel.textContent = error.message; });
+  else { agentToggle.checked = false; agentToggle.disabled = true; workspaceLabel.textContent = 'Proxy chat. Workspace access requires an administrator.'; }
   stop.addEventListener('click', () => controller?.abort());
   clear.addEventListener('click', () => {
     histories.agent = []; histories.chat = [];
@@ -58,7 +50,7 @@ function initPlayground() {
     const assistant = bubble('Working…', 'chat-assistant');
     histories[mode].push({ role: 'user', content: prompt });
     input.value = ''; input.disabled = true; send.disabled = true; clear.disabled = true;
-    agentToggle.disabled = true; keyInput.disabled = true; stop.disabled = false;
+    agentToggle.disabled = true; stop.disabled = false;
     controller = new AbortController();
     let accumulated = '', completed = false;
     const progress = (type, data) => {
@@ -82,10 +74,9 @@ function initPlayground() {
       display.scrollTop = display.scrollHeight;
     };
     try {
-      if (isAgent && !token) await connectAgent();
-      const response = await fetch(isAgent ? '/api/agent/run' : '/v1/chat/completions', {
+      const response = await apiFetch(isAgent ? '/api/agent/run' : '/v1/chat/completions', {
         method: 'POST', signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', ...(isAgent ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: histories[mode], model: document.getElementById('modelSelect').value,
           thinking: document.getElementById('toggleThinking').checked,
           deepSearch: document.getElementById('toggleDeepSearch').checked, stream })
@@ -124,14 +115,15 @@ function initPlayground() {
       renderFormattedText(assistant, accumulated);
       display.appendChild(assistant);
     } catch (error) {
+      controller.abort();
       const message = error.name === 'AbortError' ? 'Stopped. Completed changes remain in the workspace.' : error.message;
       assistant.textContent = message;
       // A failed run may have modified files: tell the next turn to inspect current state.
-      histories[mode].push({ role: 'assistant', content: `The previous run did not finish: ${message}. Inspect current workspace state before continuing.` });
-      if (!isAgent) histories.chat.pop();
+      if (isAgent) histories.agent.push({ role: 'assistant', content: `The previous run did not finish: ${message}. Inspect current workspace state before continuing.` });
+      else histories.chat.pop();
     } finally {
       controller = null; input.disabled = false; send.disabled = false; clear.disabled = false;
-      agentToggle.disabled = false; keyInput.disabled = false; stop.disabled = true;
+      agentToggle.disabled = currentUser.role !== 'admin'; stop.disabled = true;
       input.focus(); display.scrollTop = display.scrollHeight; fetchLogs();
     }
   });

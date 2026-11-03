@@ -3,14 +3,16 @@
 let currentModels = [];
 
 // Initialize on page load
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!await requireLogin()) return;
+  initAccounts();
   initStatus();
   initCopyButtons();
   initPlayground();
-  initLogs();
+  if (currentUser.role === "admin") initLogs();
 
   // Refresh status and logs periodically
-  setInterval(fetchLogs, 5000);
+  setInterval(() => { if (currentUser.role === "admin") fetchLogs(); }, 5000);
 });
 
 // Toast notification helper
@@ -39,6 +41,9 @@ function copyText(text) {
 
 // Initialize copy handlers
 function initCopyButtons() {
+  document.getElementById('configBaseUrl').textContent = location.origin + '/v1';
+  document.getElementById('statEndpoint').textContent = location.origin + '/v1';
+  document.querySelector('[data-copy="http://localhost:3000/v1"]').dataset.copy = location.origin + '/v1';
   document.querySelectorAll("[data-copy]").forEach(btn => {
     btn.addEventListener("click", () => {
       const text = btn.getAttribute("data-copy");
@@ -48,8 +53,8 @@ function initCopyButtons() {
 
   document.getElementById("copyAllConfigBtn")?.addEventListener("click", () => {
     const configText = `API Provider: OpenAI Compatible
-Base URL: http://localhost:3000/v1
-API Key: sk-freemodels-proxy
+Base URL: ${location.origin}/v1
+API Key: Paste a key created in the API Keys section
 Model ID: claude-opus-5.5`;
     copyText(configText);
   });
@@ -66,7 +71,7 @@ async function initStatus() {
   const statActiveModel = document.getElementById("statActiveModel");
 
   try {
-    const res = await fetch("/api/status");
+    const res = await apiFetch("/api/status");
     if (!res.ok) throw new Error("Status API returned " + res.status);
     const data = await res.json();
 
@@ -176,11 +181,12 @@ function escapeHtml(str) {
 
 // Fetch & render live logs
 async function fetchLogs() {
+  if (currentUser?.role !== "admin") return;
   const tbody = document.getElementById("logsTableBody");
   if (!tbody) return;
 
   try {
-    const res = await fetch("/api/logs");
+    const res = await apiFetch("/api/logs");
     if (!res.ok) return;
     const logs = await res.json();
 
@@ -226,7 +232,7 @@ async function fetchLogs() {
 function initLogs() {
   document.getElementById("refreshLogsBtn")?.addEventListener("click", fetchLogs);
   document.getElementById("clearLogsBtn")?.addEventListener("click", async () => {
-    await fetch("/api/logs/clear", { method: "POST" });
+    await apiFetch("/api/logs/clear", { method: "POST" });
     fetchLogs();
     showToast("Request logs cleared");
   });

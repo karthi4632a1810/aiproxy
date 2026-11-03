@@ -161,7 +161,7 @@ export function resolveModel(inputModel, defaultModel = "claude-opus-5.5") {
   }
 
   // Check alias map
-  if (MODEL_ALIASES[raw]) {
+  if (Object.hasOwn(MODEL_ALIASES, raw)) {
     return { modelId: MODEL_ALIASES[raw], thinkingOverride, deepSearchOverride };
   }
 

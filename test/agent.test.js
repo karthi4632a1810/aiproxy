@@ -18,13 +18,13 @@ const options = { modelId: 'test', thinking: false, deepSearch: false };
 test('workspace lifecycle: create, read, exact edit, search, command, delete', async t => {
   const ws = await fixture(t);
   await ws.execute('create_directory', { path: 'src' });
-  await ws.execute('write_file', { path: 'src/hello.js', content: 'console.log("hello");\n' });
-  assert.match((await ws.execute('read_file', { path: 'src/hello.js' })).content, /hello/);
-  await ws.execute('edit_file', { path: 'src/hello.js', old_text: 'hello', new_text: 'world' });
-  const run = await ws.execute('execute_command', { command: 'node hello.js', cwd: 'src' });
+  await ws.execute('write_file', { path: 'src/hello.sh', content: 'printf "hello\\n"\n' });
+  assert.match((await ws.execute('read_file', { path: 'src/hello.sh' })).content, /hello/);
+  await ws.execute('edit_file', { path: 'src/hello.sh', old_text: 'hello', new_text: 'world' });
+  const run = await ws.execute('execute_command', { command: 'bash hello.sh', cwd: 'src' });
   assert.equal(run.stdout, 'world\n'); assert.equal(run.exit_code, 0);
   const search = await ws.execute('search_files', { query: 'world' });
-  assert.equal(search.matches[0].path, 'src/hello.js');
+  assert.equal(search.matches[0].path, 'src/hello.sh');
   assert.equal((await ws.execute('list_files', { recursive: true })).entries.length, 2);
   await assert.rejects(ws.execute('delete_path', { path: 'src' }), /not empty/);
   await ws.execute('delete_path', { path: 'src', recursive: true });
@@ -80,12 +80,12 @@ test('agent executes dependent tools, feeds real results back, and finishes', as
     completion: async ({ messages }) => {
       step++;
       if (step === 1) return { role: 'assistant', content: null, tool_calls: [
-        call('write_file', { path: 'a.js', content: 'console.log(42)' }),
-        call('execute_command', { command: 'node a.js' })
+        call('write_file', { path: 'a.sh', content: 'printf "42\\n"' }),
+        call('execute_command', { command: 'bash a.sh' })
       ] };
       assert.equal(messages.at(-1).role, 'tool');
       assert.equal(JSON.parse(messages.at(-1).content).stdout, '42\n');
-      return { role: 'assistant', content: 'Created a.js and verified output 42.', finishReason: 'stop' };
+      return { role: 'assistant', content: 'Created a.sh and verified output 42.', finishReason: 'stop' };
     }
   });
   assert.equal(result.status, 'completed'); assert.equal(result.steps, 2);

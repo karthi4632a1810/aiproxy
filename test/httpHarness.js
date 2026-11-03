@@ -2,15 +2,15 @@ import { EventEmitter } from 'node:events';
 
 // Exercise the real Express router/middleware and handler stack without a TCP
 // listener. Response bodies use Web Streams so cancellation is tested as well.
-export function request(handler, url, { method = 'GET', headers = {}, body } = {}) {
+export function request(handler, url, { method = 'GET', headers = {}, body, remoteAddress = '127.0.0.1' } = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
     const normalized = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
     normalized.host ||= parsed.host;
-    const req = { method, url: parsed.pathname, originalUrl: parsed.pathname, path: parsed.pathname,
+    const req = { method, url: parsed.pathname + parsed.search, originalUrl: parsed.pathname + parsed.search, path: parsed.pathname,
       protocol: parsed.protocol.slice(0, -1), hostname: normalized.host.split(':')[0], headers: normalized,
       query: Object.fromEntries(parsed.searchParams), body: typeof body === 'string' ? JSON.parse(body) : body,
-      socket: { remoteAddress: '127.0.0.1' }, get(name) { return normalized[name.toLowerCase()]; } };
+      socket: { remoteAddress }, get(name) { return normalized[name.toLowerCase()]; } };
     const res = new EventEmitter();
     let output;
     const stream = new ReadableStream({ start(controller) { output = controller; }, cancel() { res.destroyed = true; res.emit('close'); } });

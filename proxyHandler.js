@@ -16,6 +16,7 @@ export function event(res, type, data) {
 }
 
 async function handle(req, res, anthropic = false) {
+  req.deferUsage = true;
   const start = Date.now();
   const options = extractOptions(req);
   const controller = new AbortController();
@@ -53,6 +54,7 @@ async function handle(req, res, anthropic = false) {
       else event(res, null, chunk({ role: 'assistant', content: '' }));
     }
     result = await complete({ messages, tools, toolChoice, options, signal: controller.signal,
+      onUsage: req.trackTokens,
       onText: options.stream ? sendText : undefined });
     const { finishReason, ...message } = result;
     const calls = result.tool_calls || [];
@@ -88,12 +90,14 @@ async function handle(req, res, anthropic = false) {
       usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens, total_tokens: inputTokens + outputTokens } });
   } catch (error) {
     status = error.status || 502; failure = error.message;
+    if (req.usage) Object.assign(req.usage, { status, outcome: 'error' });
     if (!res.destroyed) {
       const payload = { type: 'error', error: { type: 'proxy_error', message: error.message } };
       if (res.headersSent) { event(res, 'error', payload); res.end(); }
       else res.status(status).json(payload);
     }
   } finally {
+    req.finishUsage?.();
     clearInterval(heartbeat);
     res.off('close', abort);
     addLogEntry({ endpoint: req.path, model: options.modelId, ...options, messagesCount: messages.length,
