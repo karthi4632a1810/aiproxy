@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreeModels AI Proxy for Cline & Coding Agents</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="logo-group">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <span class="logo-title">AI Proxy <span class="badge-tag">Cline Edition</span></span>
+          <span class="logo-subtitle">FreeModels Bridge &bull; Claude Opus 5.5</span>
+        </div>
+      </div>
+      <div class="nav-right">
+        <div id="statusPill" class="status-pill status-loading">
+          <span class="status-dot"></span>
+          <span id="statusText">Connecting...</span>
+          <span id="latencyBadge" class="latency-badge">-- ms</span>
+        </div>
+        <a href="#setupGuide" class="btn btn-secondary btn-sm">Cline Setup</a>
+        <a href="#playground" class="btn btn-primary btn-sm">Test Chat</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    <!-- Hero Header -->
+    <section class="hero-section">
+      <div class="hero-badge">
+        <span class="badge-sparkle">✨</span> Fully Compatible with Cline, Cursor, Continue & OpenAI SDK
+      </div>
+      <h1 class="hero-title">
+        Power <span class="gradient-text">Cline Coding Agent</span> with <span class="highlight-claude">Claude Opus 5.5</span>
+      </h1>
+      <p class="hero-desc">
+        A local high-performance streaming proxy converting FreeModels Cloudflare Worker endpoints into standard OpenAI and Anthropic compatible APIs with Thinking & DeepSearch enabled.
+      </p>
+    </section>
+
+    <!-- Quick Stats Bar -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Active Model</div>
+        <div class="stat-value highlight-accent" id="statActiveModel">claude-opus-5.5</div>
+        <div class="stat-sub">Thinking & DeepSearch ON</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">OpenAI Endpoint</div>
+        <div class="stat-value font-mono text-sm" id="statEndpoint">http://localhost:3000/v1</div>
+        <div class="stat-sub">/v1/chat/completions ready</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Upstream Worker</div>
+        <div class="stat-value text-success" id="statUpstream">Active (200 OK)</div>
+        <div class="stat-sub" id="statUpstreamLatency">Cloudflare Edge latency: ~150ms</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Supported Models</div>
+        <div class="stat-value text-gradient" id="statModelsCount">9 Models</div>
+        <div class="stat-sub">Claude, GPT 5.6, GLM, Kimi</div>
+      </div>
+    </div>
+
+    <!-- Cline Setup Guide Section -->
+    <section id="setupGuide" class="section-card">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">🛠️</span>
+          <div>
+            <h2 class="section-title">Configure Cline in 30 Seconds</h2>
+            <p class="section-subtitle">Follow these 4 settings inside VS Code Cline Extension</p>
+          </div>
+        </div>
+        <button id="copyAllConfigBtn" class="btn btn-glass btn-sm">Copy All Settings</button>
+      </div>
+
+      <div class="cline-steps-grid">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <span class="step-label">API Provider</span>
+            <div class="step-val-box">
+              <code>OpenAI Compatible</code>
+              <button class="copy-icon-btn" data-copy="OpenAI Compatible" title="Copy value">📋</button>
+            </div>
+            <span class="step-hint">Select in provider dropdown</span>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <span class="step-label">Base URL</span>
+            <div class="step-val-box">
+              <code id="configBaseUrl">http://localhost:3000/v1</code>
+              <button class="copy-icon-btn" data-copy="http://localhost:3000/v1" title="Copy value">📋</button>
+            </div>
+            <span class="step-hint">Your local proxy URL</span>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <span class="step-label">API Key</span>
+            <div class="step-val-box">
+              <code>sk-freemodels-proxy</code>
+              <button class="copy-icon-btn" data-copy="sk-freemodels-proxy" title="Copy value">📋</button>
+            </div>
+            <span class="step-hint">Any non-empty string</span>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <span class="step-label">Model ID</span>
+            <div class="step-val-box">
+              <code id="configModelId">claude-opus-5.5</code>
+              <button class="copy-icon-btn" data-copy="claude-opus-5.5" title="Copy value">📋</button>
+            </div>
+            <span class="step-hint">Flagship coding & reasoning</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout-box">
+        <span class="callout-icon">💡</span>
+        <div class="callout-body">
+          <strong>Anthropic Provider Mode also supported!</strong> If you prefer setting Cline's provider to <strong>Anthropic</strong>, set Base URL to <code>http://localhost:3000</code> and Model ID to <code>claude-opus-5.5</code>. Our proxy translates <code>/v1/messages</code> and all Anthropic streaming event formats automatically!
+        </div>
+      </div>
+    </section>
+
+    <!-- Two-column: Interactive Playground & Model Grid -->
+    <div class="grid-2col">
+      <!-- Interactive Playground -->
+      <section id="playground" class="section-card">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-icon">🧪</span>
+            <div>
+              <h2 class="section-title">Interactive Live Playground</h2>
+              <p class="section-subtitle">Test streaming responses through the proxy in real-time</p>
+            </div>
+          </div>
+          <button id="clearChatBtn" class="btn btn-glass btn-sm">Clear</button>
+        </div>
+
+        <!-- Controls Toolbar -->
+        <div class="playground-controls">
+          <div class="control-group">
+            <label for="modelSelect">Model:</label>
+            <select id="modelSelect" class="form-select">
+              <option value="claude-opus-5.5" selected>Claude Opus 5.5 (Flagship)</option>
+              <option value="claude-sonnet-5">Claude Sonnet 5.5 (Thinking)</option>
+              <option value="gpt-6-astra">GPT 6 Astra (OpenAI Flagship)</option>
+              <option value="terra">GPT 5.6 Terra (Reasoning)</option>
+              <option value="sol">GPT 5.6 Sol (Fast)</option>
+              <option value="claude-fable-5.1">Claude Fable 5.1 (Creative)</option>
+              <option value="glm-5.2">GLM 5.2 (Bilingual/Tools)</option>
+              <option value="kimi-k3">Kimi K3 (200K Long Context)</option>
+            </select>
+          </div>
+
+          <div class="toggle-group">
+            <label class="toggle-label">
+              <input type="checkbox" id="toggleThinking" checked>
+              <span class="toggle-custom"></span>
+              <span>Thinking</span>
+            </label>
+            <label class="toggle-label">
+              <input type="checkbox" id="toggleDeepSearch" checked>
+              <span class="toggle-custom"></span>
+              <span>DeepSearch</span>
+            </label>
+            <label class="toggle-label">
+              <input type="checkbox" id="toggleStream" checked>
+              <span class="toggle-custom"></span>
+              <span>Stream</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Quick Prompts Chips -->
+        <div class="chips-container">
+          <span class="chips-label">Quick Prompts:</span>
+          <button class="prompt-chip" data-prompt="Hi! Introduce yourself and list your capabilities.">👋 Hello</button>
+          <button class="prompt-chip" data-prompt="Write a Python script to find the longest palindromic substring with explanations.">🐍 Python Code</button>
+          <button class="prompt-chip" data-prompt="Which is bigger: 9.11 or 9.9? Think step by step.">🧠 Logic Puzzle</button>
+        </div>
+
+        <!-- Chat Stream Window -->
+        <div class="chat-display" id="chatDisplay">
+          <div class="chat-placeholder">
+            <div class="empty-icon">💬</div>
+            <p>Send a prompt below to see the proxy stream real-time tokens directly from the model.</p>
+          </div>
+        </div>
+
+        <!-- Input Bar -->
+        <form id="chatForm" class="chat-input-row">
+          <textarea id="promptInput" class="form-textarea" placeholder="Type a message or coding task..." rows="2"></textarea>
+          <button type="submit" id="sendBtn" class="btn btn-primary btn-send">
+            <span id="sendBtnIcon">🚀</span> Send
+          </button>
+        </form>
+      </section>
+
+      <!-- Supported Models Catalog -->
+      <section class="section-card">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-icon">🤖</span>
+            <div>
+              <h2 class="section-title">Supported Models</h2>
+              <p class="section-subtitle">Click any model ID to copy for Cline</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="models-list" id="modelsList">
+          <!-- Populated by JavaScript -->
+          <div class="loading-state">Loading models...</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Live Request Inspector -->
+    <section class="section-card" id="logsSection">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">📡</span>
+          <div>
+            <h2 class="section-title">Live Request Inspector</h2>
+            <p class="section-subtitle">Watch Cline's requests arriving and streaming in real time</p>
+          </div>
+        </div>
+        <div class="action-buttons">
+          <button id="refreshLogsBtn" class="btn btn-glass btn-sm">🔄 Refresh</button>
+          <button id="clearLogsBtn" class="btn btn-glass btn-sm">Clear Logs</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Endpoint</th>
+              <th>Model</th>
+              <th>Flags</th>
+              <th>Status</th>
+              <th>Tokens / Latency</th>
+              <th>Response Preview</th>
+            </tr>
+          </thead>
+          <tbody id="logsTableBody">
+            <tr>
+              <td colspan="7" class="empty-table-state">No requests yet. Send a message in Cline or the playground above!</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- API Reference Cards -->
+    <section class="section-card">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <span class="section-icon">📖</span>
+          <div>
+            <h2 class="section-title">API Endpoints Reference</h2>
+            <p class="section-subtitle">Integrate with any tool or SDK using standard endpoints</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="api-grid">
+        <div class="api-card">
+          <div class="api-method-pill post">POST</div>
+          <code class="api-endpoint">/v1/chat/completions</code>
+          <p class="api-desc">Standard OpenAI chat completion endpoint. Supports streaming SSE, multi-turn chat, system prompts, and thinking flags.</p>
+        </div>
+        <div class="api-card">
+          <div class="api-method-pill get">GET</div>
+          <code class="api-endpoint">/v1/models</code>
+          <p class="api-desc">Returns list of all available models formatted for OpenAI clients and model selector dropdowns.</p>
+        </div>
+        <div class="api-card">
+          <div class="api-method-pill post">POST</div>
+          <code class="api-endpoint">/v1/messages</code>
+          <p class="api-desc">Anthropic format endpoint for Cline or Claude clients. Automatically adapts Anthropic events and system fields.</p>
+        </div>
+        <div class="api-card">
+          <div class="api-method-pill post">POST</div>
+          <code class="api-endpoint">/api/chat</code>
+          <p class="api-desc">Direct custom forwarder matching your original payload format with <code>modelId</code>, <code>thinking</code>, and <code>deepSearch</code>.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div>FreeModels AI Proxy &bull; Designed for Cline & Agentic Coding</div>
+      <div class="footer-links">
+        <a href="http://localhost:3000/v1/models" target="_blank">View /v1/models JSON</a>
+        <a href="http://localhost:3000/health" target="_blank">Health Check</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast">Copied to clipboard!</div>
+
+  <script src="app.js"></script>
+</body>
+</html>

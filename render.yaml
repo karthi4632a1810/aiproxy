@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: aiproxy-cline
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.20.2
+      - key: PORT
+        value: 10000
+      - key: DEFAULT_MODEL
+        value: claude-opus-5.5
+      - key: DEFAULT_THINKING
+        value: "true"
+      - key: DEFAULT_DEEP_SEARCH
+        value: "true"
+      - key: UPSTREAM_URL
+        value: https://freemodels-chat.freemodels.workers.dev
