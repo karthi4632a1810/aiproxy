@@ -8,22 +8,35 @@ const local = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socke
   && ['localhost', '127.0.0.1', '[::1]'].includes(req.hostname);
 
 export function createSecurity(store, { origin = process.env.APP_ORIGIN, setupToken = process.env.SETUP_TOKEN } = {}) {
-  if (origin) origin = new URL(origin).origin;
+  const allowedOrigins = (origin || '').split(',').map(s => s.trim()).filter(Boolean);
   const cookieToken = req => (req.get('cookie') || '').split(';').map(x => x.trim()).find(x => x.startsWith(COOKIE + '='))?.slice(COOKIE.length + 1);
+  const strip = u => String(u || '').replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase();
   const expectedOrigin = req => {
-    if (origin) return origin;
+    if (origin && !origin.includes(',')) return origin;
     const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
     return `${proto}://${req.get('host')}`;
   };
   const isMatchingOrigin = (req, checkOriginVal) => {
     if (!checkOriginVal) return true;
+    const strippedCheck = strip(checkOriginVal);
+    for (const allowed of allowedOrigins) {
+      if (strip(allowed) === strippedCheck) return true;
+    }
     const exp = expectedOrigin(req);
-    if (checkOriginVal === exp) return true;
-    const strip = u => String(u).replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase();
-    return strip(checkOriginVal) === strip(exp);
+    if (checkOriginVal === exp || strip(exp) === strippedCheck) return true;
+    const host = strip(req.get('host'));
+    if (host && (strippedCheck === host || strippedCheck.endsWith('.' + host))) return true;
+    const fwdHost = strip(req.get('x-forwarded-host'));
+    if (fwdHost && (strippedCheck === fwdHost || strippedCheck.endsWith('.' + fwdHost))) return true;
+    return false;
   };
   const checkOrigin = (req, res, next) => {
-    if ((req.get('origin') && !isMatchingOrigin(req, req.get('origin'))) || req.get('sec-fetch-site') === 'cross-site') {
+    const originHeader = req.get('origin');
+    if (originHeader) {
+      if (!isMatchingOrigin(req, originHeader)) {
+        return next(fail(403, 'Cross-origin account access denied'));
+      }
+    } else if (req.get('sec-fetch-site') === 'cross-site') {
       return next(fail(403, 'Cross-origin account access denied'));
     }
     next();
@@ -42,13 +55,27 @@ export function createSecurity(store, { origin = process.env.APP_ORIGIN, setupTo
       const bearer = authorization?.match(/^Bearer\s+(\S+)$/i)?.[1];
       if ((authorization && !bearer) || (bearer && alternate && bearer !== alternate)) throw fail(401, 'Invalid API credentials');
       const token = bearer || alternate;
-      const key = token && store.data.keys.find(k => k.hash === digest(token) && !k.revokedAt && (!k.expiresAt || Date.parse(k.expiresAt) > Date.now()));
-      const user = key && store.data.users.find(u => u.id === key.userId && !u.disabled);
-      if (user) auth = { user, key, kind: 'key' };
+      const masterKey = process.env.MASTER_API_KEY || process.env.PROXY_API_KEY;
+      if (masterKey && token === masterKey) {
+        auth = {
+          user: { id: 'master', name: 'Master Admin', email: 'admin@proxy.local', role: 'admin' },
+          key: { id: 'master-key', name: 'Master API Key', agent: true, workspace: true },
+          kind: 'key'
+        };
+      } else {
+        const key = token && store.data.keys.find(k => k.hash === digest(token) && !k.revokedAt && (!k.expiresAt || Date.parse(k.expiresAt) > Date.now()));
+        const user = key && store.data.users.find(u => u.id === key.userId && !u.disabled);
+        if (user) auth = { user, key, kind: 'key' };
+      }
     } else auth = session(req);
     if (!auth) throw fail(401, 'Log in or supply a valid API key');
     if (auth.kind === 'session') {
-      if ((req.get('origin') && !isMatchingOrigin(req, req.get('origin'))) || req.get('sec-fetch-site') === 'cross-site') throw fail(403, 'Cross-origin session access denied');
+      const originHeader = req.get('origin');
+      if (originHeader) {
+        if (!isMatchingOrigin(req, originHeader)) throw fail(403, 'Cross-origin session access denied');
+      } else if (req.get('sec-fetch-site') === 'cross-site') {
+        throw fail(403, 'Cross-origin session access denied');
+      }
       if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('x-csrf-token') !== auth.session.csrf) throw fail(403, 'Invalid CSRF token; reload and try again');
     }
     if ((admin || agent) && auth.user.role !== 'admin') throw fail(403, 'Administrator access required');

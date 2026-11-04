@@ -199,3 +199,30 @@ test('login throttles repeated failed attempts and expired sessions cannot manag
   await store.change(data => { data.sessions[0].expiresAt = Date.now() - 1; });
   assert.equal((await send('/api/account/keys', { headers: admin.headers })).status, 401);
 });
+
+test('master API key permits administrative inference requests', async t => {
+  const prevMaster = process.env.MASTER_API_KEY;
+  process.env.MASTER_API_KEY = 'sk-test-master-key';
+  t.after(() => {
+    if (prevMaster === undefined) delete process.env.MASTER_API_KEY;
+    else process.env.MASTER_API_KEY = prevMaster;
+  });
+
+  const { store } = await fixture(t);
+  const security = createSecurity(store);
+  const guard = express.Router();
+  guard.get('/v1/models', security.requireAccess(), (req, res) => res.json({ ok: true, user: req.auth.user.role }));
+  guard.use(security.errorHandler);
+
+  const resValid = await request(guard, 'http://localhost/v1/models', {
+    headers: { Authorization: 'Bearer sk-test-master-key' }
+  });
+  assert.equal(resValid.status, 200);
+  const body = await resValid.json();
+  assert.equal(body.user, 'admin');
+
+  const resInvalid = await request(guard, 'http://localhost/v1/models', {
+    headers: { Authorization: 'Bearer sk-wrong-key' }
+  });
+  assert.equal(resInvalid.status, 401);
+});
