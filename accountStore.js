@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes, randomUUID, createHash, scrypt as derive, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import { MongoClient } from 'mongodb';
 
 const scrypt = promisify(derive);
 export const digest = value => createHash('sha256').update(value).digest('hex');
@@ -28,16 +29,55 @@ export async function verifyPassword(password, stored) {
 
 // A single-process durable store. Writes are serialized, fsynced and atomically
 // renamed; memory is published only after a successful save. No raw credentials.
+// When MONGODB_URI or MONGO_URI is set, data is also persisted in MongoDB Atlas.
 export class AccountStore {
-  constructor(directory) { this.directory = path.resolve(directory); this.file = path.join(this.directory, 'accounts.json'); this.queue = Promise.resolve(); }
+  constructor(directory, { mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI } = {}) {
+    this.directory = path.resolve(directory);
+    this.file = path.join(this.directory, 'accounts.json');
+    this.mongoUri = mongoUri;
+    this.mongoClient = null;
+    this.mongoCollection = null;
+    this.queue = Promise.resolve();
+  }
   async init() {
     await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
-    try { this.data = JSON.parse(await fs.readFile(this.file, 'utf8')); }
-    catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-      this.data = { version: 1, users: [], keys: [], sessions: [], requests: [], daily: [] };
-      await this.change(() => {});
+
+    if (this.mongoUri) {
+      try {
+        this.mongoClient = new MongoClient(this.mongoUri, { serverSelectionTimeoutMS: 5000 });
+        await this.mongoClient.connect();
+        const db = this.mongoClient.db('aiproxy');
+        this.mongoCollection = db.collection('accounts_store');
+        const doc = await this.mongoCollection.findOne({ _id: 'main' });
+        if (doc && doc.data && Array.isArray(doc.data.users)) {
+          this.data = doc.data;
+        } else {
+          // If mongo collection is empty, migrate existing local file or initialize default
+          let initial = { version: 1, users: [], keys: [], sessions: [], requests: [], daily: [] };
+          try { initial = JSON.parse(await fs.readFile(this.file, 'utf8')); } catch {}
+          this.data = initial;
+          await this.mongoCollection.updateOne(
+            { _id: 'main' },
+            { $set: { data: this.data, updatedAt: new Date() } },
+            { upsert: true }
+          );
+        }
+        console.log('[AccountStore] Connected to MongoDB Atlas successfully.');
+      } catch (err) {
+        console.error('[AccountStore] MongoDB connection warning:', err.message, '- falling back to local file.');
+        this.mongoCollection = null;
+      }
     }
+
+    if (!this.mongoCollection) {
+      try { this.data = JSON.parse(await fs.readFile(this.file, 'utf8')); }
+      catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        this.data = { version: 1, users: [], keys: [], sessions: [], requests: [], daily: [] };
+        await this.change(() => {});
+      }
+    }
+
     if (this.data.version !== 1 || !['users', 'keys', 'sessions', 'requests', 'daily'].every(k => Array.isArray(this.data[k]))) throw new Error('Invalid account store; restore a valid backup');
     // Do not report an interrupted request as successful after restarting.
     await this.change(data => {
@@ -50,6 +90,21 @@ export class AccountStore {
     const job = this.queue.then(async () => {
       const next = structuredClone(this.data);
       const result = await operation(next);
+
+      // Persist to MongoDB if connected
+      if (this.mongoCollection) {
+        try {
+          await this.mongoCollection.updateOne(
+            { _id: 'main' },
+            { $set: { data: next, updatedAt: new Date() } },
+            { upsert: true }
+          );
+        } catch (mErr) {
+          console.error('[AccountStore] MongoDB write error:', mErr.message);
+        }
+      }
+
+      // Also persist to local file as backup
       const temp = this.file + '.' + randomUUID() + '.tmp';
       try {
         const file = await fs.open(temp, 'wx', 0o600);

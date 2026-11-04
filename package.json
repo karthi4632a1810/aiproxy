@@ -9,7 +9,9 @@
     "dev": "node --watch server.js",
     "test": "node test/run.js"
   },
-  "engines": { "node": ">=20.3" },
+  "engines": {
+    "node": ">=20.3"
+  },
   "keywords": [
     "cline",
     "ai-proxy",
@@ -22,6 +24,7 @@
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^18.0.9",
-    "express": "^5.3.0"
+    "express": "^5.3.0",
+    "mongodb": "^7.8.0"
   }
 }
